@@ -1,0 +1,28 @@
+version: "3.9"
+
+services:
+  # ========================================
+  # DATABASE (PostgreSQL)
+  # ========================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: azhur-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: azhur_katering
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - azhur-network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  azhur-network:
+    driver: bridge

@@ -1,0 +1,99 @@
+spring:
+  application:
+    name: azhur-katering-backend-java
+
+  # ========================================
+  # DATABASE CONFIGURATION
+  # ========================================
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/azhur_katering}
+    username: ${DATABASE_USERNAME:postgres}
+    password: ${DATABASE_PASSWORD:password}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+
+  # ========================================
+  # FLYWAY MIGRATION CONFIGURATION
+  # ========================================
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    validate-on-migrate: true
+    out-of-order: false
+    table: flyway_schema_history
+    sql-migration-prefix: V
+    sql-migration-separator: __
+    sql-migration-suffixes: .sql
+    clean-disabled: false
+
+  # ========================================
+  # EMAIL CONFIGURATION (YANDEX)
+  # ========================================
+  mail:
+    host: ${SPRING_MAIL_HOST:smtp.yandex.ru}
+    port: ${SPRING_MAIL_PORT:465}
+    username: ${YANDEX_USERNAME}
+    password: ${SMTP_PASSWORD}
+    properties:
+      mail.smtp.auth: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH:true}
+      mail.smtp.ssl.enable: true
+      mail.smtp.starttls.enable: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE:false}
+      mail.smtp.connectiontimeout: 10000
+      mail.smtp.timeout: 10000
+      mail.smtp.writetimeout: 10000
+
+# ========================================
+# JWT CONFIGURATION
+# ========================================
+jwt:
+  secret: ${JWT_SECRET}
+  expiration: ${JWT_EXPIRATION:900000}  # 15 минут
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}  # 7 дней
+
+# ========================================
+# COOKIE CONFIGURATION
+# ========================================
+app:
+  cookie:
+    domain: ${COOKIE_DOMAIN:}  # Оставить пустым для localhost
+    secure: ${COOKIE_SECURE:false}  # false для http, true для https
+
+# ========================================
+# SERVER CONFIGURATION
+# ========================================
+server:
+  port: 8080
+
+# ========================================
+# LOGGING
+# ========================================
+# logging:
+#   level:
+#     root: INFO
+#     azhue.katering: DEBUG
+#     org.springframework.mail: DEBUG
+#     com.sun.mail: DEBUG
+#     org.springframework.security: DEBUG
+#     org.hibernate: DEBUG
+#     org.springdoc: DEBUG
+#     org.springframework.web: DEBUG
+
+# ========================================
+# SWAGGER/OPENAPI CONFIGURATION
+# ========================================
+springdoc:
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
