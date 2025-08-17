@@ -35,14 +35,6 @@ public class SecurityHeadersConfig {
     }
 
     /**
-     * Заголовок X-XSS-Protection для XSS защиты браузера
-     */
-    @Bean
-    public HeaderWriter xXssProtectionHeaderWriter() {
-        return new StaticHeadersWriter("X-XSS-Protection", "1; mode=block");
-    }
-
-    /**
      * Заголовок HSTS для принуждения HTTPS
      */
     @Bean
@@ -60,22 +52,25 @@ public class SecurityHeadersConfig {
     }
 
     /**
-     * Заголовок Content-Security-Policy для контроля ресурсов
+     * Заголовок Content-Security-Policy в режиме Report-Only
+     * 
+     * <p>В режиме Report-Only CSP не блокирует ресурсы, а только отправляет отчеты
+     * о нарушениях. Это позволяет безопасно тестировать политику перед
+     * включением в боевом режиме.</p>
      */
     @Bean
     public HeaderWriter contentSecurityPolicyHeaderWriter() {
         String csp = "default-src 'self'; " +
-                "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
-                "style-src 'self' 'unsafe-inline'; " +
+                "script-src 'self'; " +
+                "style-src 'self'; " +
                 "img-src 'self' data: https:; " +
                 "font-src 'self' data:; " +
                 "connect-src 'self'; " +
                 "frame-ancestors 'none'; " +
                 "base-uri 'self'; " +
-                "form-action 'self'; " +
-                "upgrade-insecure-requests";
+                "form-action 'self'";
         
-        return new StaticHeadersWriter("Content-Security-Policy", csp);
+        return new StaticHeadersWriter("Content-Security-Policy-Report-Only", csp);
     }
 
     /**

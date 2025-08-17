@@ -2,7 +2,6 @@ package azhue.katering.azhurkateringbackendjava.auth.controller;
 
 import azhue.katering.azhurkateringbackendjava.auth.model.dto.request.ChangePasswordRequest;
 import azhue.katering.azhurkateringbackendjava.auth.model.dto.request.LoginRequest;
-import azhue.katering.azhurkateringbackendjava.auth.model.dto.request.RefreshTokenRequest;
 import azhue.katering.azhurkateringbackendjava.auth.model.dto.request.RegisterRequest;
 import azhue.katering.azhurkateringbackendjava.auth.model.dto.response.AuthResponse;
 import azhue.katering.azhurkateringbackendjava.auth.service.contract.AuthService;
@@ -30,6 +29,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 import java.util.UUID;
+import azhue.katering.azhurkateringbackendjava.common.exception.token.TokenNotFoundException;
 
 /**
  * REST контроллер для управления аутентификацией и авторизацией пользователей.
@@ -281,14 +281,11 @@ public class AuthController {
         
         String refreshToken = cookieService.getRefreshTokenFromCookie(request);
         if (refreshToken == null) {
-            throw new RuntimeException("Refresh token не найден");
+            throw new TokenNotFoundException("Refresh token не найден в cookies");
         }
         
-        RefreshTokenRequest refreshRequest = new RefreshTokenRequest();
-        refreshRequest.setRefreshToken(refreshToken);
-        
         HttpUtils.RequestInfo requestInfo = httpUtils.getRequestInfo(request);
-        AuthResponse authResponse = authService.refreshToken(refreshRequest, requestInfo.ipAddress(), requestInfo.userAgent());
+        AuthResponse authResponse = authService.refreshToken(refreshToken, requestInfo.ipAddress(), requestInfo.userAgent());
         
         // Обновляем токены в cookies
         cookieService.setAccessTokenCookie(response, authResponse.getAccessToken());

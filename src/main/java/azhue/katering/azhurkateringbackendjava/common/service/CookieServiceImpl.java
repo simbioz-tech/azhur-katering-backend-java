@@ -15,8 +15,8 @@ import java.util.Optional;
  * Реализация сервиса для работы с HTTP cookies.
  * 
  * <p>Предоставляет методы для создания, получения и удаления безопасных cookies
- * для хранения JWT токенов. Все cookies создаются с флагами HttpOnly и Secure
- * для обеспечения безопасности.</p>
+ * для хранения JWT токенов. Использует префикс __Host- для максимальной безопасности.
+ * Все cookies создаются с флагами HttpOnly и Secure.</p>
  * 
  * @version 1.0.0
  */
@@ -24,11 +24,8 @@ import java.util.Optional;
 @Slf4j
 public class CookieServiceImpl implements CookieService {
 
-    private static final String ACCESS_TOKEN_COOKIE_NAME = "access_token";
-    private static final String REFRESH_TOKEN_COOKIE_NAME = "refresh_token";
-    
-    @Value("${app.cookie.domain:}")
-    private String cookieDomain;
+    private static final String ACCESS_TOKEN_COOKIE_NAME = "__Host-access-token";
+    private static final String REFRESH_TOKEN_COOKIE_NAME = "__Host-refresh-token";
     
     @Value("${app.cookie.secure:true}")
     private boolean cookieSecure;
@@ -38,7 +35,7 @@ public class CookieServiceImpl implements CookieService {
      */
     @Override
     public void setAccessTokenCookie(HttpServletResponse response, String token) {
-        Cookie cookie = createSecureCookie(ACCESS_TOKEN_COOKIE_NAME, token, 1800); // 30 минут
+        Cookie cookie = createSecureCookie(ACCESS_TOKEN_COOKIE_NAME, token, 900); // 15 минут
         response.addCookie(cookie);
         log.debug("Access token cookie установлен");
     }
@@ -100,18 +97,22 @@ public class CookieServiceImpl implements CookieService {
     }
 
     /**
-     * Создает безопасный cookie с указанными параметрами
+     * Создает безопасный cookie с префиксом __Host-
+     * 
+     * <p>Cookies с префиксом __Host- автоматически получают следующие свойства:
+     * - Secure: true (обязательно)
+     * - Path: / (обязательно)
+     * - Domain: не устанавливается (обязательно)</p>
      */
     private Cookie createSecureCookie(String name, String value, int maxAge) {
         Cookie cookie = new Cookie(name, value);
         cookie.setHttpOnly(true);
-        cookie.setSecure(cookieSecure);
+        cookie.setSecure(true); // Обязательно для __Host- cookies
         cookie.setPath("/");
         cookie.setMaxAge(maxAge);
         
-        if (cookieDomain != null && !cookieDomain.isEmpty()) {
-            cookie.setDomain(cookieDomain);
-        }
+        // Для __Host- cookies нельзя устанавливать domain
+        // Это обеспечивает дополнительную безопасность
         
         return cookie;
     }
@@ -122,13 +123,9 @@ public class CookieServiceImpl implements CookieService {
     private Cookie createExpiredCookie(String name) {
         Cookie cookie = new Cookie(name, "");
         cookie.setHttpOnly(true);
-        cookie.setSecure(cookieSecure);
+        cookie.setSecure(true); // Обязательно для __Host- cookies
         cookie.setPath("/");
         cookie.setMaxAge(0);
-        
-        if (cookieDomain != null && !cookieDomain.isEmpty()) {
-            cookie.setDomain(cookieDomain);
-        }
         
         return cookie;
     }

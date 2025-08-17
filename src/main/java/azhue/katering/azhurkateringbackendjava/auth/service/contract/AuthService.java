@@ -1,7 +1,6 @@
 package azhue.katering.azhurkateringbackendjava.auth.service.contract;
 
 import azhue.katering.azhurkateringbackendjava.auth.model.dto.request.LoginRequest;
-import azhue.katering.azhurkateringbackendjava.auth.model.dto.request.RefreshTokenRequest;
 import azhue.katering.azhurkateringbackendjava.auth.model.dto.request.RegisterRequest;
 import azhue.katering.azhurkateringbackendjava.auth.model.dto.response.AuthResponse;
 
@@ -28,9 +27,9 @@ public interface AuthService {
     AuthResponse login(LoginRequest request, String ipAddress, String userAgent);
     
     /**
-     * Обновляет access token
+     * Обновляет access token используя refresh token из cookie
      */
-    AuthResponse refreshToken(RefreshTokenRequest request, String ipAddress, String userAgent);
+    AuthResponse refreshToken(String refreshToken, String ipAddress, String userAgent);
     
     /**
      * Выполняет выход пользователя

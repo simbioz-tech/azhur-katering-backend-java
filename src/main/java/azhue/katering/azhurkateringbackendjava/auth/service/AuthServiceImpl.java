@@ -167,14 +167,12 @@ public class AuthServiceImpl implements AuthService {
     }
 
     /**
-     * Обновляет access token
+     * Обновляет access token используя refresh token из cookie
      */
     @Override
     @Transactional
-    public AuthResponse refreshToken(RefreshTokenRequest request, String ipAddress, String userAgent) {
+    public AuthResponse refreshToken(String refreshToken, String ipAddress, String userAgent) {
         try {
-            String refreshToken = request.getRefreshToken();
-            
             // Проверяем, что это refresh token
             if (!jwtUtil.isRefreshToken(refreshToken)) {
                 throw new TypeTokenException("Неверный тип токена");

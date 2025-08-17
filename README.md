@@ -4,7 +4,7 @@
 
 ## 🚀 Особенности
 
-- **🔐 Безопасная аутентификация** - JWT токены с HTTP-only cookies
+- **🔐 Безопасная аутентификация** - JWT токены с HTTP-only cookies (префикс `__Host-`)
 - **📧 Email верификация** - Подтверждение email адресов через Yandex SMTP
 - **🛡️ Защита от атак** - Rate limiting, блокировка аккаунтов, security headers
 - **🗄️ Миграции БД** - Flyway для управления схемой
@@ -138,11 +138,7 @@ Content-Type: application/json
 ### Обновление токена
 ```http
 POST /api/v1/auth/refresh
-Content-Type: application/json
-
-{
-  "refreshToken": "your-refresh-token"
-}
+# Refresh token автоматически читается из cookie __Host-refresh-token
 ```
 
 ## 📊 API Endpoints
@@ -150,7 +146,7 @@ Content-Type: application/json
 ### Аутентификация
 - `POST /api/v1/auth/register` - Регистрация
 - `POST /api/v1/auth/login` - Вход
-- `POST /api/v1/auth/refresh` - Обновление токена
+- `POST /api/v1/auth/refresh` - Обновление токена (только из cookie)
 - `POST /api/v1/auth/logout` - Выход
 - `POST /api/v1/auth/verify-email` - Верификация email
 - `POST /api/v1/auth/send-verification` - Отправка кода верификации
@@ -218,7 +214,7 @@ docker-compose up -d
 - Алгоритм: HS512
 - Время жизни access токена: 15 минут
 - Время жизни refresh токена: 7 дней
-- Хранение: HTTP-only cookies
+- Хранение: HTTP-only cookies с префиксом `__Host-`
 
 ### Rate Limiting
 - Аутентификация: 5 попыток в минуту
@@ -230,9 +226,8 @@ docker-compose up -d
 ### Security Headers
 - X-Content-Type-Options: nosniff
 - X-Frame-Options: DENY
-- X-XSS-Protection: 1; mode=block
 - Strict-Transport-Security
-- Content-Security-Policy
+- Content-Security-Policy-Report-Only
 - Permissions-Policy
 
 ### Блокировка аккаунтов
@@ -246,8 +241,6 @@ docker-compose up -d
 - `INFO` - Общая информация
 - `WARN` - Предупреждения
 - `ERROR` - Ошибки
-
-
 
 ## 📚 Документация
 
