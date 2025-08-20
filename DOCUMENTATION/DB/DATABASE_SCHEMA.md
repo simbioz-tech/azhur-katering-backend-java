@@ -134,8 +134,8 @@ CREATE TABLE dishes (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(200) NOT NULL,
     description TEXT,
-    price DECIMAL(10,2) NOT NULL,
-    category_id UUID REFERENCES categories(id) ON DELETE SET NULL,
+    price DECIMAL(10,2) NOT NULL, CHECK (price >= 0) ,
+    category_id UUID REFERENCES categories(id) ON DELETE RESTRICT,
     image_url VARCHAR(500),
     thumbnail_url VARCHAR(500),
     in_stock BOOLEAN DEFAULT true,
@@ -160,7 +160,6 @@ CREATE TABLE cart_items (
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     dish_id UUID NOT NULL REFERENCES dishes(id) ON DELETE CASCADE,
     quantity INTEGER NOT NULL DEFAULT 1,
-    total_price DECIMAL(10,2) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     version BIGINT DEFAULT 0
@@ -170,7 +169,6 @@ CREATE TABLE cart_items (
 **Назначение:** Хранение товаров в корзине пользователя
 **Ключевые поля:**
 - `quantity` - количество блюд
-- `total_price` - общая стоимость позиции
 
 
 ## Связи между таблицами
@@ -181,7 +179,7 @@ CREATE TABLE cart_items (
 - `users` → `email_verifications` (1:N) - пользователь может запрашивать несколько кодов
 - `users` → `cart_items` (1:N) - пользователь может иметь несколько товаров в корзине
 
-- `categories` → `dishes` (1:N) - категория содержит множество блюд
+- `categories` → `dishes` (N:N) - категория содержит множество блюд
 - `dishes` → `cart_items` (1:N) - блюдо может быть в нескольких корзинах
 
 ## Индексы для оптимизации

@@ -39,60 +39,45 @@
 
 ## API Endpoints
 
-### Аутентификация:
+### Аутентификация (/api/v1/auth):
 ```
-POST   /api/v1/auth/register          # Регистрация пользователя
-POST   /api/v1/auth/login             # Вход в систему
-POST   /api/v1/auth/refresh           # Обновление токена
-POST   /api/v1/auth/logout            # Выход из системы
-POST   /api/v1/auth/change-password   # Смена пароля
-POST   /api/v1/auth/send-verification # Отправка кода верификации
-POST   /api/v1/auth/verify-email      # Подтверждение email
-GET    /api/v1/auth/me                # Информация о текущем пользователе
-```
-
-### Меню и блюда:
-```
-GET    /api/v1/categories             # Список категорий
-GET    /api/v1/categories/{id}        # Детали категории
-POST   /api/v1/categories             # Создание категории (ADMIN)
-PUT    /api/v1/categories/{id}        # Обновление категории (ADMIN)
-DELETE /api/v1/categories/{id}        # Удаление категории (ADMIN)
-
-GET    /api/v1/dishes                 # Список блюд с фильтрацией
-GET    /api/v1/dishes/{id}            # Детали блюда
-POST   /api/v1/dishes                 # Создание блюда (ADMIN)
-PUT    /api/v1/dishes/{id}            # Обновление блюда (ADMIN)
-DELETE /api/v1/dishes/{id}            # Удаление блюда (ADMIN)
-POST   /api/v1/dishes/{id}/images     # Загрузка изображения (ADMIN)
-DELETE /api/v1/dishes/{id}/images/{imageId} # Удаление изображения (ADMIN)
-```
-### Корзина:
-```
-GET    /api/v1/cart                   # Получить корзину пользователя
-POST   /api/v1/cart/items             # Добавить блюдо в корзину
-PUT    /api/v1/cart/items/{id}        # Обновить количество
-DELETE /api/v1/cart/items/{id}        # Удалить из корзины
-DELETE /api/v1/cart                   # Очистить корзину
-```
-### Отзывы:
-```
-GET    /api/v1/reviews    # Отзывы
-POST   /api/v1/reviews    # Оставить отзыв
-PUT    /api/v1/reviews/{id}           # Обновить отзыв
-DELETE /api/v1/reviews/{id}           # Удалить отзыв
-GET    /api/v1/admin/reviews          # Все отзывы (ADMIN)
-PUT    /api/v1/admin/reviews/{id}/approve # Одобрить отзыв (ADMIN)
+•	POST /register - Регистрация пользователя. Отправка кода верификации email.
+•	POST /login - Вход в систему. Устанавливает пару access/refresh токенов в Cookie с флагом HttpOnly.
+•	POST /refresh - Обновление access-токена по валидному refresh-токену.
+•	POST /logout - Выход из системы. Инвалидирует refresh-токен и удаляет пару токенов из Cookie.
+•	POST /change-password - Смена пароля (требует текущий пароль). (USER, ADMIN)
+•	POST /send-verification - Отправка кода верификации email.
+•	POST /verify-email - Подтверждение email по коду.
+•	GET /me - Информация о текущем аутентифицированном пользователе. (USER, MODERATOR, ADMIN)
 ```
 
-Если потребуется
-### Заказы:
+### Категории (/api/v1/categories):
 ```
-GET    /api/v1/orders                 # История заказов пользователя
-GET    /api/v1/orders/{id}            # Детали заказа
-POST   /api/v1/orders                 # Создать заказ
-PUT    /api/v1/orders/{id}/status     # Обновить статус (ADMIN)
-GET    /api/v1/admin/orders           # Все заказы (ADMIN)
+•	GET / - Список всех категорий. Поддержка пагинации (?page=1&size=10).
+•	GET /{id} - Детали категории по ID.
+•	POST / - Создание новой категории. (ADMIN)
+•	PUT /{id} - Обновление категории. (ADMIN)
+•	DELETE /{id} - Удаление категории. (ADMIN)
 ```
 
+### Блюда (/api/v1/dishes):
+```
+•	GET / - Список блюд. Поддержка фильтрации (?categoryId=5&vegetarian=true), пагинации и сортировки (?sortBy=price&sortOrder=asc).
+•	GET /{id} - Детали блюда по ID.
+•	POST / - Создание нового блюда. (MODERATOR, ADMIN)
+•	PUT /{id} - Обновление блюда. (MODERATOR, ADMIN)
+•	DELETE /{id} - Удаление блюда. (ADMIN) // Удаление часто оставляют только админу
+•	PATCH /is_available/{id} – Обновление флага “В наличии” (MODERATOR, ADMIN)
+•	POST /{id}/images - Загрузка изображения для блюда. (MODERATOR, ADMIN)
+•	DELETE /{id}/images/{imageId} - Удаление конкретного изображения блюда. (MODERATOR, ADMIN)
+```
+
+### Корзина (/api/v1/cart):
+```
+•	GET / - Получить содержимое корзины текущего пользователя. (USER)
+•	POST /items - Добавить блюдо (в теле запроса dishId и quantity). (USER)
+•	PUT /items/{itemId}  - Изменить количество блюда в корзине. {itemId} - это ID записи в корзине. (USER)
+•	DELETE /items/{itemId} - Удалить позицию из корзины. (USER)
+•	DELETE / - Очистить всю корзину пользователя. (USER)
+```
 
