@@ -1,29 +1,28 @@
 package azhue.katering.azhurkateringbackendjava.auth.service;
 
+import azhue.katering.azhurkateringbackendjava.auth.exception.account.AccountIsLockedException;
+import azhue.katering.azhurkateringbackendjava.auth.exception.account.IncorrectPasswordException;
+import azhue.katering.azhurkateringbackendjava.auth.exception.account.UserNotFoundException;
+import azhue.katering.azhurkateringbackendjava.auth.exception.account.UsernameExistsException;
+import azhue.katering.azhurkateringbackendjava.auth.exception.token.TokenExpiredException;
+import azhue.katering.azhurkateringbackendjava.auth.exception.token.TokenNotFoundException;
+import azhue.katering.azhurkateringbackendjava.auth.exception.token.TokenNotValidException;
+import azhue.katering.azhurkateringbackendjava.auth.exception.token.TypeTokenException;
 import azhue.katering.azhurkateringbackendjava.auth.model.dto.request.LoginRequest;
-import azhue.katering.azhurkateringbackendjava.auth.model.dto.request.RefreshTokenRequest;
 import azhue.katering.azhurkateringbackendjava.auth.model.dto.request.RegisterRequest;
 import azhue.katering.azhurkateringbackendjava.auth.model.dto.response.AuthResponse;
-import azhue.katering.azhurkateringbackendjava.auth.model.entity.AuthLog;
 import azhue.katering.azhurkateringbackendjava.auth.model.entity.RefreshToken;
 import azhue.katering.azhurkateringbackendjava.auth.model.entity.User;
 import azhue.katering.azhurkateringbackendjava.auth.repository.RefreshTokenRepository;
 import azhue.katering.azhurkateringbackendjava.auth.repository.UserRepository;
 import azhue.katering.azhurkateringbackendjava.auth.service.contract.AuthService;
 import azhue.katering.azhurkateringbackendjava.auth.service.contract.EmailService;
-import azhue.katering.azhurkateringbackendjava.auth.service.contract.LoggingAuthActions;
-import azhue.katering.azhurkateringbackendjava.common.exception.account.AccountIsLockedException;
-import azhue.katering.azhurkateringbackendjava.common.exception.account.IncorrectPasswordException;
-import azhue.katering.azhurkateringbackendjava.common.exception.account.UserNotFoundException;
-import azhue.katering.azhurkateringbackendjava.common.exception.token.TokenExpiredException;
-import azhue.katering.azhurkateringbackendjava.common.exception.token.TokenNotFoundException;
-import azhue.katering.azhurkateringbackendjava.common.exception.token.TokenNotValidException;
-import azhue.katering.azhurkateringbackendjava.common.exception.token.TypeTokenException;
+import azhue.katering.azhurkateringbackendjava.common.service.MetricsService;
+import azhue.katering.azhurkateringbackendjava.common.util.LogUtils;
 import azhue.katering.azhurkateringbackendjava.security.jwt.util.JwtUtil;
-import io.jsonwebtoken.JwtException;
+import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -49,7 +48,7 @@ public class AuthServiceImpl implements AuthService {
     private final EmailService emailService;
     private final JwtUtil jwtUtil;
     private final PasswordEncoder passwordEncoder;
-    private final LoggingAuthActions loggingAuthActions;
+    private final MetricsService metricsService;
     
     private static final int MAX_FAILED_ATTEMPTS = 5;
     private static final int LOCK_TIME_MINUTES = 30;
@@ -60,38 +59,54 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public void register(RegisterRequest request, String ipAddress, String userAgent) {
-        // Проверяем, существует ли пользователь
-        if (userRepository.existsByEmail(request.getEmail())) {
-            loggingAuthActions.logAuthAction(null, AuthLog.AuthAction.REGISTRATION_FAILED, ipAddress, userAgent, false, "Email уже существует");
-            throw new UserNotFoundException("Пользователь с таким email уже существует");
+        LogUtils.setOperationTags(LogUtils.OPERATION_REGISTER, null, request.getEmail(), ipAddress, LogUtils.STATUS_START);
+        log.info("Начинаем регистрацию пользователя: email={}, username={}", request.getEmail(), request.getUsername());
+        Timer.Sample timer = metricsService.startRegisterProcessingTimer();
+        
+        try {
+            // Проверяем, существует ли пользователь
+            if (userRepository.existsByEmail(request.getEmail())) {
+                LogUtils.setOperationTags(LogUtils.OPERATION_REGISTER, null, request.getEmail(), ipAddress, LogUtils.STATUS_FAILED);
+                log.warn("Попытка регистрации с существующим email: email={}", request.getEmail());
+                throw new UserNotFoundException("Пользователь с таким email уже существует");
+            }
+
+            if (userRepository.existsByUsername(request.getUsername())) {
+                LogUtils.setOperationTags(LogUtils.OPERATION_REGISTER, null, request.getEmail(), ipAddress, LogUtils.STATUS_FAILED);
+                log.warn("Попытка регистрации с существующим username: username={}", request.getUsername());
+                throw new UsernameExistsException("Пользователь с таким username уже существует");
+            }
+
+            log.info("Создаем нового пользователя: email={}, username={}", request.getEmail(), request.getUsername());
+            // Создаем пользователя
+            User user = User.builder()
+                    .username(request.getUsername())
+                    .email(request.getEmail())
+                    .passwordHash(passwordEncoder.encode(request.getPassword()))
+                    .role(User.Role.USER)
+                    .isActive(true)
+                    .isVerified(false) // Требуется верификация email
+                    .isAccountNonLocked(true)
+                    .failedAttempts(0)
+                    .build();
+
+            user = userRepository.save(user);
+            LogUtils.setOperationTags(LogUtils.OPERATION_REGISTER, user.getId().toString(), user.getEmail(), ipAddress, LogUtils.STATUS_SUCCESS);
+            log.info("Пользователь сохранен: userId={}, email={}, username={}", user.getId(), user.getEmail(), user.getUsername());
+
+            log.info("Отправляем код верификации: userId={}, email={}", user.getId(), user.getEmail());
+            emailService.sendVerificationCodeAsync(user, ipAddress);
+            log.info("Код верификации отправлен: userId={}, email={}", user.getId(), user.getEmail());
+
+            log.info("Регистрация завершена успешно: userId={}, email={}, username={}", user.getId(), user.getEmail(), user.getUsername());
+            
+            // Увеличиваем счетчик регистраций
+            metricsService.incrementRegistrations();
+            
+        } finally {
+            LogUtils.clearTags();
+            metricsService.stopRegisterProcessingTimer(timer);
         }
-
-        if (userRepository.existsByUsername(request.getUsername())) {
-            loggingAuthActions.logAuthAction(null, AuthLog.AuthAction.REGISTRATION_FAILED, ipAddress, userAgent, false, "Username уже существует");
-            throw new RuntimeException("Пользователь с таким username уже существует");
-        }
-
-        // Создаем пользователя
-        User user = User.builder()
-                .username(request.getUsername())
-                .email(request.getEmail())
-                .passwordHash(passwordEncoder.encode(request.getPassword()))
-                .role(User.Role.USER)
-                .isActive(true)
-                .isVerified(false) // Требуется верификация email
-                .isAccountNonLocked(true)
-                .failedAttempts(0)
-                .build();
-
-        user = userRepository.save(user);
-        log.info("User saved successfully with ID: {}", user.getId());
-
-        log.info("Calling email service for user: {}", user.getEmail());
-        emailService.sendVerificationCodeAsync(user, ipAddress);
-        log.info("Email service called successfully for user: {}", user.getEmail());
-
-        loggingAuthActions.logAuthAction(user, AuthLog.AuthAction.REGISTRATION, ipAddress, userAgent, true, null);
-        log.info("Пользователь зарегистрирован и ему отправлен код на почту {}", user.getEmail());
     }
 
     /**
@@ -100,70 +115,99 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public AuthResponse login(LoginRequest request, String ipAddress, String userAgent) {
-        User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> {
-                    loggingAuthActions.logAuthAction(null, AuthLog.AuthAction.LOGIN_FAILED, ipAddress, userAgent, false, "Пользователь не найден");
-                    return new BadCredentialsException("Неверный email или пароль");
-                });
+        LogUtils.setOperationTags(LogUtils.OPERATION_LOGIN, null, request.getEmail(), ipAddress, LogUtils.STATUS_START);
+        log.info("Попытка входа: email={}", request.getEmail());
+        Timer.Sample timer = metricsService.startLoginProcessingTimer();
+        metricsService.incrementLoginAttempts();
+        
+        try {
+            User user = userRepository.findByEmail(request.getEmail())
+                    .orElseThrow(() -> {
+                        LogUtils.setOperationTags(LogUtils.OPERATION_LOGIN, null, request.getEmail(), ipAddress, LogUtils.STATUS_FAILED);
+                        log.warn("Попытка входа с несуществующим email: email={}", request.getEmail());
+                        metricsService.incrementFailedLogins();
+                        return new UserNotFoundException("Пользователь с таким email не найден");
+                    });
 
-        // Проверяем, заблокирован ли аккаунт
-        if (user.isAccountLocked()) {
-            loggingAuthActions.logAuthAction(user, AuthLog.AuthAction.LOGIN_FAILED, ipAddress, userAgent, false, "Аккаунт заблокирован");
-            throw new AccountIsLockedException("Аккаунт заблокирован. Попробуйте позже.");
-        }
+            log.info("Пользователь найден: userId={}, email={}, isVerified={}, isLocked={}", 
+                    user.getId(), user.getEmail(), user.getIsVerified(), user.isAccountLocked());
 
-        // Проверяем пароль
-        if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
-            handleFailedLogin(user);
-            loggingAuthActions.logAuthAction(user, AuthLog.AuthAction.LOGIN_FAILED, ipAddress, userAgent, false, "Неверный пароль");
-            throw new IncorrectPasswordException("Неверный пароль");
-        }
+            // Проверяем, заблокирован ли аккаунт
+            if (user.isAccountLocked()) {
+                LogUtils.setOperationTags(LogUtils.OPERATION_LOGIN, user.getId().toString(), user.getEmail(), ipAddress, LogUtils.STATUS_FAILED);
+                log.warn("Попытка входа в заблокированный аккаунт: userId={}, email={}", user.getId(), user.getEmail());
+                metricsService.incrementFailedLogins();
+                throw new AccountIsLockedException("Аккаунт заблокирован. Попробуйте позже.");
+            }
 
-        // Проверяем, верифицирован ли email
-        if (!user.getIsVerified()) {
-            log.info("Попытка входа неверифицированного пользователя: {}. Отправляем новый код подтверждения", user.getEmail());
+            // Проверяем пароль
+            if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
+                LogUtils.setOperationTags(LogUtils.OPERATION_LOGIN, user.getId().toString(), user.getEmail(), ipAddress, LogUtils.STATUS_FAILED);
+                log.warn("Неверный пароль: userId={}, email={}", user.getId(), user.getEmail());
+                handleFailedLogin(user);
+                metricsService.incrementFailedLogins();
+                throw new IncorrectPasswordException("Неверный пароль");
+            }
+
+            log.info("Пароль проверен успешно: userId={}, email={}", user.getId(), user.getEmail());
+
+            // Проверяем, верифицирован ли email
+            if (!user.getIsVerified()) {
+                log.info("Попытка входа неверифицированного пользователя: userId={}, email={}, ip={}", user.getId(), user.getEmail(), ipAddress);
+                
+                // Отправляем новый код подтверждения
+                emailService.sendVerificationCodeAsync(user, ipAddress);
+                log.info("Новый код подтверждения отправлен: userId={}, email={}", user.getId(), user.getEmail());
+
+                metricsService.incrementFailedLogins();
+                
+                // Возвращаем специальный ответ вместо исключения
+                return AuthResponse.builder()
+                        .requiresVerification(true)
+                        .verificationMessage("Email не верифицирован. Новый код подтверждения отправлен на вашу почту.")
+                        .email(user.getEmail())
+                        .username(user.getUsername())
+                        .isVerified(false)
+                        .build();
+            }
+
+            log.info("Email верифицирован, сбрасываем счетчик неудачных попыток: userId={}, email={}", user.getId(), user.getEmail());
+
+            // Сбрасываем счетчик неудачных попыток
+            user.resetFailedAttempts();
+            userRepository.save(user);
+
+            log.info("Генерируем токены: userId={}, email={}", user.getId(), user.getEmail());
+
+            // Генерируем токены
+            String accessToken = jwtUtil.generateAccessToken(user.getEmail(), user.getId().toString(), user.getRole().name());
+            String refreshToken = jwtUtil.generateRefreshToken(user.getEmail(), user.getId().toString());
+
+            // Сохраняем refresh token
+            saveRefreshToken(user, refreshToken, ipAddress, userAgent);
+
+            LogUtils.setOperationTags(LogUtils.OPERATION_LOGIN, user.getId().toString(), user.getEmail(), ipAddress, LogUtils.STATUS_SUCCESS);
+            log.info("Вход выполнен успешно: userId={}, email={}, role={}", user.getId(), user.getEmail(), user.getRole());
             
-            // Отправляем новый код подтверждения
-            emailService.sendVerificationCodeAsync(user, ipAddress);
-            log.info("Новый код подтверждения отправлен для пользователя: {}", user.getEmail());
-            
-            loggingAuthActions.logAuthAction(user, AuthLog.AuthAction.LOGIN_FAILED, ipAddress, userAgent, false, "Email не верифицирован, отправлен новый код");
-            
-            // Возвращаем специальный ответ вместо исключения
+            // Увеличиваем счетчик успешных входов
+            metricsService.incrementSuccessfulLogins();
+
             return AuthResponse.builder()
-                    .requiresVerification(true)
-                    .verificationMessage("Email не верифицирован. Новый код подтверждения отправлен на вашу почту.")
+                    .accessToken(accessToken)
+                    .refreshToken(refreshToken)
+                    .tokenType("Bearer")
+                    .expiresIn(jwtUtil.getTimeUntilExpiration(accessToken))
+                    .userId(user.getId().toString())
                     .email(user.getEmail())
                     .username(user.getUsername())
-                    .isVerified(false)
+                    .role(user.getRole().name())
+                    .isVerified(user.getIsVerified())
                     .build();
+                    
+        } finally {
+            LogUtils.clearTags();
+            metricsService.stopLoginProcessingTimer(timer);
         }
-
-        // Сбрасываем счетчик неудачных попыток
-        user.resetFailedAttempts();
-        userRepository.save(user);
-
-        // Генерируем токены
-        String accessToken = jwtUtil.generateAccessToken(user.getEmail(), user.getId().toString(), user.getRole().name());
-        String refreshToken = jwtUtil.generateRefreshToken(user.getEmail(), user.getId().toString());
-
-        // Сохраняем refresh token
-        saveRefreshToken(user, refreshToken, ipAddress, userAgent);
-
-        loggingAuthActions.logAuthAction(user, AuthLog.AuthAction.LOGIN, ipAddress, userAgent, true, null);
-        log.info("Пользователь вошел в систему: {}", user.getEmail());
-
-        return AuthResponse.builder()
-                .accessToken(accessToken)
-                .refreshToken(refreshToken)
-                .tokenType("Bearer")
-                .expiresIn(jwtUtil.getTimeUntilExpiration(accessToken))
-                .userId(user.getId().toString())
-                .email(user.getEmail())
-                .username(user.getUsername())
-                .role(user.getRole().name())
-                .isVerified(user.getIsVerified())
-                .build();
     }
 
     /**
@@ -172,118 +216,54 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public AuthResponse refreshToken(String refreshToken, String ipAddress, String userAgent) {
+        LogUtils.setOperationTags(LogUtils.OPERATION_REFRESH_TOKEN, null, null, ipAddress, LogUtils.STATUS_START);
+        log.info("Начинаем обновление токенов");
+        Timer.Sample timer = metricsService.startRefreshTokenProcessingTimer();
+        
         try {
             // Проверяем, что это refresh token
             if (!jwtUtil.isRefreshToken(refreshToken)) {
                 throw new TypeTokenException("Неверный тип токена");
             }
 
-            String email = jwtUtil.extractEmail(refreshToken);
+        log.info("Получаем email из refresh token");
+        String email = jwtUtil.extractEmail(refreshToken);
+        LogUtils.setEmail(email);
 
-            if (jwtUtil.isTokenExpired(refreshToken)) {
-                throw new TokenExpiredException("Refresh token истек");
-            }
-
-            User user = userRepository.findByEmail(email)
-                    .orElseThrow(() -> new UserNotFoundException("Пользователь не найден"));
-
-            // Проверяем, существует ли refresh token в БД
-            RefreshToken storedToken = refreshTokenRepository.findByToken(refreshToken)
-                    .orElseThrow(() -> new TokenNotFoundException("Refresh token не найден"));
-
-            if (!storedToken.isValid()) {
-                throw new TokenNotValidException("Refresh token отозван или истек");
-            }
-
-            // Генерируем новые токены
-            String newAccessToken = jwtUtil.generateAccessToken(user.getEmail(), user.getId().toString(), user.getRole().name());
-            String newRefreshToken = jwtUtil.generateRefreshToken(user.getEmail(), user.getId().toString());
-
-            // Отзываем старый refresh token
-            storedToken.revoke();
-            refreshTokenRepository.save(storedToken);
-
-            // Сохраняем новый refresh token
-            saveRefreshToken(user, newRefreshToken, ipAddress, userAgent);
-
-            loggingAuthActions.logAuthAction(user, AuthLog.AuthAction.LOGIN, ipAddress, userAgent, true, "Token refreshed");
-
-            return AuthResponse.builder()
-                    .accessToken(newAccessToken)
-                    .refreshToken(newRefreshToken)
-                    .tokenType("Bearer")
-                    .expiresIn(jwtUtil.getTimeUntilExpiration(newAccessToken))
-                    .userId(user.getId().toString())
-                    .email(user.getEmail())
-                    .username(user.getUsername())
-                    .role(user.getRole().name())
-                    .isVerified(user.getIsVerified())
-                    .build();
-
-        } catch (JwtException e) {
-            loggingAuthActions.logAuthAction(null, AuthLog.AuthAction.LOGIN_FAILED, ipAddress, userAgent, false, "Неверный refresh token");
-            throw new RuntimeException("Неверный refresh token");
+        if (jwtUtil.isTokenExpired(refreshToken)) {
+            LogUtils.setOperationTags(LogUtils.OPERATION_REFRESH_TOKEN, null, email, ipAddress, LogUtils.STATUS_FAILED);
+            log.warn("Refresh token истек: email={}", email);
+            throw new TokenExpiredException("Refresh token истек");
         }
-    }
 
-    /**
-     * Выполняет выход пользователя
-     */
-    @Override
-    @Transactional
-    public void logout(String refreshToken, String ipAddress, String userAgent) {
-        try {
-            String email = jwtUtil.extractEmail(refreshToken);
-            User user = userRepository.findByEmail(email).orElse(null);
-
-            // Отзываем refresh token
-            refreshTokenRepository.findByToken(refreshToken)
-                    .ifPresent(token -> {
-                        token.revoke();
-                        refreshTokenRepository.save(token);
-                    });
-
-            loggingAuthActions.logAuthAction(user, AuthLog.AuthAction.LOGOUT, ipAddress, userAgent, true, null);
-            log.info("Пользователь вышел из системы: {}", email);
-        } catch (Exception e) {
-            log.warn("Ошибка при выходе пользователя: {}", e.getMessage());
-        }
-    }
-
-    /**
-     * Изменяет пароль пользователя
-     */
-    @Override
-    @Transactional
-    public AuthResponse changePassword(UUID userId, String oldPassword, String newPassword, String ipAddress, String userAgent) {
-        User user = userRepository.findById(userId)
+        log.info("Ищем пользователя в БД: email={}", email);
+        User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new UserNotFoundException("Пользователь не найден"));
+        LogUtils.setUserId(user.getId().toString());
 
-        // Проверяем текущий пароль
-        if (!passwordEncoder.matches(oldPassword, user.getPasswordHash())) {
-            loggingAuthActions.logAuthAction(user, AuthLog.AuthAction.PASSWORD_CHANGED, ipAddress, userAgent, false, "Неверный текущий пароль");
-            throw new IncorrectPasswordException("Неверный текущий пароль");
+        log.info("Проверяем существование refresh токена: userId={}, email={}", user.getId(), user.getEmail());
+        RefreshToken storedToken = refreshTokenRepository.findByToken(refreshToken)
+                .orElseThrow(() -> new TokenNotFoundException("Refresh token не найден"));
+
+        if (!storedToken.isValid()) {
+            LogUtils.setOperationTags(LogUtils.OPERATION_REFRESH_TOKEN, user.getId().toString(), user.getEmail(), ipAddress, LogUtils.STATUS_FAILED);
+            log.warn("Refresh token невалиден: userId={}, email={}", user.getId(), user.getEmail());
+            throw new TokenNotValidException("Refresh token отозван или истек");
         }
 
-        // Обновляем пароль
-        user.setPasswordHash(passwordEncoder.encode(newPassword));
-        user.setPasswordChangedAt(LocalDateTime.now());
-        userRepository.save(user);
-
-        // Отзываем все refresh токены пользователя
-        refreshTokenRepository.revokeAllUserTokens(user, LocalDateTime.now());
-
-        // Генерируем новые токены
+        log.info("Генерируем новую пару токенов: userId={}, email={}", user.getId(), user.getEmail());
         String newAccessToken = jwtUtil.generateAccessToken(user.getEmail(), user.getId().toString(), user.getRole().name());
         String newRefreshToken = jwtUtil.generateRefreshToken(user.getEmail(), user.getId().toString());
 
-        // Сохраняем новый refresh token
+        log.info("Отзываем старый refresh токен: userId={}, email={}", user.getId(), user.getEmail());
+        storedToken.revoke();
+        refreshTokenRepository.save(storedToken);
+
         saveRefreshToken(user, newRefreshToken, ipAddress, userAgent);
 
-        loggingAuthActions.logAuthAction(user, AuthLog.AuthAction.PASSWORD_CHANGED, ipAddress, userAgent, true, null);
-        log.info("Пароль изменен для пользователя: {}", user.getEmail());
-
-        // Возвращаем новые токены
+        LogUtils.setOperationTags(LogUtils.OPERATION_REFRESH_TOKEN, user.getId().toString(), user.getEmail(), ipAddress, LogUtils.STATUS_SUCCESS);
+        log.info("Обновление токенов завершено успешно: userId={}, email={}", user.getId(), user.getEmail());
+        
         return AuthResponse.builder()
                 .accessToken(newAccessToken)
                 .refreshToken(newRefreshToken)
@@ -295,12 +275,110 @@ public class AuthServiceImpl implements AuthService {
                 .role(user.getRole().name())
                 .isVerified(user.getIsVerified())
                 .build();
+        } finally {
+            LogUtils.clearTags();
+            metricsService.stopRefreshTokenProcessingTimer(timer);
+        }
+    }
+
+    /**
+     * Выполняет выход пользователя
+     */
+    @Override
+    @Transactional
+    public void logout(String refreshToken, String ipAddress, String userAgent) {
+        LogUtils.setOperationTags(LogUtils.OPERATION_LOGOUT, null, null, ipAddress, LogUtils.STATUS_START);
+        log.info("Пользователь выходит из системы");
+        Timer.Sample timer = metricsService.startLogoutProcessingTimer();
+        
+        try {
+            String email = jwtUtil.extractEmail(refreshToken);
+            LogUtils.setEmail(email);
+
+            log.info("Отзываем refresh токен: email={}, ip={}", email, ipAddress);
+            refreshTokenRepository.findByToken(refreshToken)
+                    .ifPresent(token -> {
+                        token.revoke();
+                        refreshTokenRepository.save(token);
+                    });
+
+            LogUtils.setOperationTags(LogUtils.OPERATION_LOGOUT, null, email, ipAddress, LogUtils.STATUS_SUCCESS);
+            log.info("Пользователь вышел из системы: email={}", email);
+        } finally {
+            LogUtils.clearTags();
+            metricsService.stopLogoutProcessingTimer(timer);
+        }
+    }
+
+    /**
+     * Изменяет пароль пользователя
+     */
+    @Override
+    @Transactional
+    public AuthResponse changePassword(UUID userId, String oldPassword, String newPassword, String ipAddress, String userAgent) {
+        LogUtils.setOperationTags(LogUtils.OPERATION_CHANGE_PASSWORD, userId.toString(), null, ipAddress, LogUtils.STATUS_START);
+        log.info("Начинаем смену пароля: userId={}", userId);
+        Timer.Sample timer = metricsService.startChangePasswordProcessingTimer();
+
+        try {
+
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new UserNotFoundException("Пользователь не найден"));
+            LogUtils.setEmail(user.getEmail());
+
+            log.info("Проверяем текущий пароль: userId={}, email={}", user.getId(), user.getEmail());
+
+            // Проверяем текущий пароль
+            if (!passwordEncoder.matches(oldPassword, user.getPasswordHash())) {
+                LogUtils.setOperationTags(LogUtils.OPERATION_CHANGE_PASSWORD, user.getId().toString(), user.getEmail(), ipAddress, LogUtils.STATUS_FAILED);
+                log.warn("Неверный текущий пароль: userId={}, email={}", user.getId(), user.getEmail());
+                throw new IncorrectPasswordException("Неверный текущий пароль");
+            }
+
+            log.info("Текущий пароль проверен, обновляем пароль: userId={}, email={}", user.getId(), user.getEmail());
+            user.setPasswordHash(passwordEncoder.encode(newPassword));
+            user.setPasswordChangedAt(LocalDateTime.now());
+            userRepository.save(user);
+
+            log.info("Отзываем все refresh токены: userId={}, email={}", user.getId(), user.getEmail());
+            // Отзываем все refresh токены пользователя
+            refreshTokenRepository.revokeAllUserTokens(user, LocalDateTime.now());
+
+            log.info("Генерируем новые токены: userId={}, email={}", user.getId(), user.getEmail());
+            // Генерируем новые токены
+            String newAccessToken = jwtUtil.generateAccessToken(user.getEmail(), user.getId().toString(), user.getRole().name());
+            String newRefreshToken = jwtUtil.generateRefreshToken(user.getEmail(), user.getId().toString());
+
+            // Сохраняем новый refresh token
+            saveRefreshToken(user, newRefreshToken, ipAddress, userAgent);
+
+            LogUtils.setOperationTags(LogUtils.OPERATION_CHANGE_PASSWORD, user.getId().toString(), user.getEmail(), ipAddress, LogUtils.STATUS_SUCCESS);
+            log.info("Смена пароля завершена успешно: userId={}, email={}", user.getId(), user.getEmail());
+
+            // Возвращаем новые токены
+            return AuthResponse.builder()
+                    .accessToken(newAccessToken)
+                    .refreshToken(newRefreshToken)
+                    .tokenType("Bearer")
+                    .expiresIn(jwtUtil.getTimeUntilExpiration(newAccessToken))
+                    .userId(user.getId().toString())
+                    .email(user.getEmail())
+                    .username(user.getUsername())
+                    .role(user.getRole().name())
+                    .isVerified(user.getIsVerified())
+                    .build();
+        } finally {
+            LogUtils.clearTags();
+            metricsService.stopChangePasswordProcessingTimer(timer);
+        }
     }
 
     /**
      * Сохраняет refresh token в базе данных
      */
     private void saveRefreshToken(User user, String token, String ipAddress, String userAgent) {
+        log.debug("Сохраняем refresh token для пользователя: {}", user.getEmail());
+        
         RefreshToken refreshToken = RefreshToken.builder()
                 .user(user)
                 .token(token)
@@ -310,6 +388,7 @@ public class AuthServiceImpl implements AuthService {
                 .build();
         
         refreshTokenRepository.save(refreshToken);
+        log.debug("Refresh token сохранен успешно для пользователя: {}", user.getEmail());
     }
 
     /**

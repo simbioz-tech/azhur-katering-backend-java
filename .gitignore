@@ -32,6 +32,9 @@ build/
 ### VS Code ###
 .vscode/
 
+### logs ###
+/logs/
+
 ### Secrets ###
 .env
 /vault-secrets/

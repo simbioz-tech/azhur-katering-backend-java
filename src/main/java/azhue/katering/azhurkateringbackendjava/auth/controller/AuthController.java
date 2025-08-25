@@ -7,7 +7,7 @@ import azhue.katering.azhurkateringbackendjava.auth.model.dto.response.AuthRespo
 import azhue.katering.azhurkateringbackendjava.auth.service.contract.AuthService;
 import azhue.katering.azhurkateringbackendjava.auth.service.contract.CurrentUserService;
 import azhue.katering.azhurkateringbackendjava.auth.service.contract.EmailService;
-import azhue.katering.azhurkateringbackendjava.common.service.contract.CookieService;
+import azhue.katering.azhurkateringbackendjava.auth.service.contract.CookieService;
 import azhue.katering.azhurkateringbackendjava.common.util.contract.HttpUtils;
 import azhue.katering.azhurkateringbackendjava.common.annotation.RateLimit;
 import io.swagger.v3.oas.annotations.Operation;
@@ -29,7 +29,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 import java.util.UUID;
-import azhue.katering.azhurkateringbackendjava.common.exception.token.TokenNotFoundException;
+import azhue.katering.azhurkateringbackendjava.auth.exception.token.TokenNotFoundException;
 
 /**
  * REST контроллер для управления аутентификацией и авторизацией пользователей.

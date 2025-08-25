@@ -2,8 +2,8 @@ package azhue.katering.azhurkateringbackendjava.auth.service;
 
 import azhue.katering.azhurkateringbackendjava.auth.model.entity.User;
 import azhue.katering.azhurkateringbackendjava.auth.service.contract.CurrentUserService;
-import azhue.katering.azhurkateringbackendjava.common.exception.account.UserNotAuthenticatedException;
-import azhue.katering.azhurkateringbackendjava.common.exception.account.UserNotFoundException;
+import azhue.katering.azhurkateringbackendjava.auth.exception.account.UserNotAuthenticatedException;
+import azhue.katering.azhurkateringbackendjava.auth.exception.account.UserNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;

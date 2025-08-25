@@ -70,3 +70,6 @@ logging:
     azhue.katering: INFO
     org.springframework.security: WARN
     org.springframework.web: WARN
+    # Отключаем автоматическое логирование исключений Spring Boot
+    org.springframework.web.servlet.mvc.method.annotation.ExceptionHandlerExceptionResolver: ERROR
+    org.springframework.web.servlet.mvc.support.DefaultHandlerExceptionResolver: ERROR

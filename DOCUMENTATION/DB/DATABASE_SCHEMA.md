@@ -62,30 +62,6 @@ CREATE TABLE refresh_tokens (
 - `ip_address` - IP адрес устройства
 - `user_agent` - информация о браузере
 
-### **Таблица логов аутентификации (auth_logs)**
-
-```sql
-CREATE TABLE auth_logs (
-    id UUID PRIMARY KEY,
-    user_id UUID REFERENCES users(id) ON DELETE SET NULL,
-    action VARCHAR(50) NOT NULL, -- login, logout, failed_login, password_change.
-    ip_address VARCHAR(45),
-    user_agent TEXT,
-    success BOOLEAN DEFAULT true,
-    failure_reason VARCHAR(500),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    version BIGINT DEFAULT 0
-);
-```
-
-**Назначение:** Логирование всех действий аутентификации
-**Ключевые поля:**
-- `action` - тип действия (login, logout, failed_login, password_change)
-- `success` - успешность операции
-- `failure_reason` - причина неудачи
-- `ip_address` - IP адрес для безопасности
-
 ### **Таблица верификации email (email_verifications)**
 
 ```sql
@@ -175,7 +151,6 @@ CREATE TABLE cart_items (
 
 ### **Основные связи:**
 - `users` → `refresh_tokens` (1:N) - пользователь может иметь несколько refresh токенов
-- `users` → `auth_logs` (1:N) - пользователь генерирует множество логов
 - `users` → `email_verifications` (1:N) - пользователь может запрашивать несколько кодов
 - `users` → `cart_items` (1:N) - пользователь может иметь несколько товаров в корзине
 
@@ -193,10 +168,6 @@ CREATE INDEX idx_users_username ON users(username);
 -- Refresh токены
 CREATE INDEX idx_refresh_tokens_token ON refresh_tokens(token);
 CREATE INDEX idx_refresh_tokens_user_expires ON refresh_tokens(user_id, expires_at) WHERE is_revoked = false;
-
--- Логи аутентификации
-CREATE INDEX idx_auth_logs_user_id ON auth_logs(user_id);
-CREATE INDEX idx_auth_logs_user_action_date ON auth_logs(user_id, action, created_at);
 
 -- Верификация email
 CREATE INDEX idx_email_verifications_user_id ON email_verifications(user_id);

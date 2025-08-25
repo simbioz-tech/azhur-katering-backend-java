@@ -19,8 +19,134 @@ services:
     networks:
       - azhur-network
 
+  # ========================================
+  # REDIS (для кэширования и сессий)
+  # ========================================
+#  redis:
+#    image: redis:7-alpine
+#    container_name: azhur-redis
+#    restart: unless-stopped
+#    ports:
+#      - "6379:6379"
+#    volumes:
+#      - redis_data:/data
+#    command: redis-server --appendonly yes
+#    networks:
+#      - azhur-network
+
+  # ========================================
+  # ELASTICSEARCH (для хранения логов)
+  # ========================================
+  elasticsearch:
+    image: elasticsearch:8.11.0
+    container_name: azhur-elasticsearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - azhur-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # ========================================
+  # LOGSTASH (для обработки логов)
+  # ========================================
+  logstash:
+    image: logstash:9.1.2
+    container_name: azhur-logstash
+    restart: unless-stopped
+    ports:
+      - "5044:5044"
+      - "5000:5000/tcp"
+      - "5000:5000/udp"
+      - "9600:9600"
+    environment:
+      LS_JAVA_OPTS: "-Xmx256m -Xms256m"
+    volumes:
+      - ./logstash/pipeline:/usr/share/logstash/pipeline
+      - ./logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml
+    networks:
+      - azhur-network
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
+  # ========================================
+  # KIBANA (для визуализации логов)
+  # ========================================
+  kibana:
+    image: kibana:8.11.0
+    container_name: azhur-kibana
+    restart: unless-stopped
+    ports:
+      - "5601:5601"
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+    networks:
+      - azhur-network
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
+  # ========================================
+  # PROMETHEUS (мониторинг)
+  # ========================================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: azhur-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - azhur-network
+
+  # ========================================
+  # GRAFANA (визуализация метрик)
+  # ========================================
+  grafana:
+    image: grafana/grafana:latest
+    container_name: azhur-grafana
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - azhur-network
+
 volumes:
   postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  elasticsearch_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
     driver: local
 
 networks:

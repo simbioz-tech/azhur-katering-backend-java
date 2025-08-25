@@ -1,7 +1,7 @@
 package azhue.katering.azhurkateringbackendjava.security.filter;
 
 import azhue.katering.azhurkateringbackendjava.auth.service.UserDetailsServiceImpl;
-import azhue.katering.azhurkateringbackendjava.common.service.contract.CookieService;
+import azhue.katering.azhurkateringbackendjava.auth.service.contract.CookieService;
 import azhue.katering.azhurkateringbackendjava.security.jwt.util.JwtUtil;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
