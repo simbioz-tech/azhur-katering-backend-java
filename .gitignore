@@ -38,3 +38,6 @@ build/
 ### Secrets ###
 .env
 /vault-secrets/
+
+### Images ###
+/uploads/

@@ -51,6 +51,32 @@ spring:
       mail.smtp.timeout: 10000
       mail.smtp.writetimeout: 10000
 
+  # ========================================
+  # REDIS CONFIGURATION
+  # ========================================
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:0}
+      lettuce:
+        pool:
+          max-active: ${REDIS_MAX_ACTIVE:8}
+          max-idle: ${REDIS_MAX_IDLE:8}
+          min-idle: ${REDIS_MIN_IDLE:0}
+          max-wait: ${REDIS_MAX_WAIT:-1}
+
+  # ========================================
+  # MULTIPART CONFIGURATION
+  # ========================================
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 10MB
+      max-request-size: 10MB
+      file-size-threshold: 2KB
+
 # ========================================
 # JWT CONFIGURATION
 # ========================================
@@ -66,6 +92,27 @@ app:
   cookie:
     domain: ${COOKIE_DOMAIN:}  # Оставить пустым для localhost
     secure: ${COOKIE_SECURE:false}  # false для http, true для https
+  
+  # ========================================
+  # Настройки для изображений блюд
+  # ========================================
+  images:
+    max:
+      file:
+        size: 5242880 # 5MB
+
+  # ========================================
+  # S3 STORAGE CONFIGURATION (VK Cloud)
+  # ========================================
+  s3:
+    provider: vk-cloud
+    bucket: azhur-katering-image
+    endpoint: https://hb.ru-msk.vkcloud-storage.ru
+    region: ru-msk
+    access-key: ${VK_CLOUD_ACCESS_KEY}
+    secret-key: ${VK_CLOUD_SECRET_KEY}
+    max-batch-size: 50
+    cache-control: "public, max-age=31536000" # 1 год кэша
 
 # ========================================
 # SERVER CONFIGURATION
@@ -78,14 +125,14 @@ server:
 # ========================================
 logging:
   level:
-    root: INFO
-    azhue.katering: DEBUG
-    org.springframework.mail: DEBUG
-    com.sun.mail: DEBUG
-    org.springframework.security: DEBUG
-    org.hibernate: DEBUG
-    org.springdoc: DEBUG
-    org.springframework.web: DEBUG
+#    root: INFO
+#    azhue.katering: DEBUG
+#    org.springframework.mail: DEBUG
+#    com.sun.mail: DEBUG
+#    org.springframework.security: DEBUG
+#    org.hibernate: DEBUG
+#    org.springdoc: DEBUG
+#    org.springframework.web: DEBUG
     # Отключаем автоматическое логирование исключений Spring Boot
     org.springframework.web.servlet.mvc.method.annotation.ExceptionHandlerExceptionResolver: ERROR
     org.springframework.web.servlet.mvc.support.DefaultHandlerExceptionResolver: ERROR
@@ -108,7 +155,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,prometheus
+        include: health,metrics,prometheus,caches
       base-path: /actuator
   endpoint:
     health:

@@ -1,7 +1,7 @@
 package azhue.katering.azhurkateringbackendjava.common.exception;
 
-import azhue.katering.azhurkateringbackendjava.common.dto.ApiResponse;
 import azhue.katering.azhurkateringbackendjava.common.exception.general.RateLimitExceededException;
+import azhue.katering.azhurkateringbackendjava.common.model.dto.ApiResponse;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -12,6 +12,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
@@ -126,6 +127,23 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Обрабатывает общие ошибки IOException
+     */
+    @ExceptionHandler(IOException.class)
+    public ResponseEntity<ApiResponse<Void>> handleIOException(IOException ex) {
+
+        log.error("IO error: {}", ex.getMessage(), ex);
+
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.<Void>builder()
+                        .success(false)
+                        .message("Ошибка обработки файла")
+                        .errorCode("IO_ERROR")
+                        .timestamp(LocalDateTime.now())
+                        .build());
+    }
+
+    /**
      * Обрабатывает все остальные исключения
      */
     @ExceptionHandler(Exception.class)
@@ -137,7 +155,7 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.<Void>builder()
                         .success(false)
-                        .message("Internal server error")
+                        .message("Неизвестная ошибка")
                         .errorCode("INTERNAL_SERVER_ERROR")
                         .timestamp(LocalDateTime.now())
                         .build());

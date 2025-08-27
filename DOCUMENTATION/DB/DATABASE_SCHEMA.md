@@ -114,7 +114,7 @@ CREATE TABLE dishes (
     category_id UUID REFERENCES categories(id) ON DELETE RESTRICT,
     image_url VARCHAR(500),
     thumbnail_url VARCHAR(500),
-    in_stock BOOLEAN DEFAULT true,
+    is_available BOOLEAN DEFAULT true,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     version BIGINT DEFAULT 0

@@ -22,17 +22,17 @@ services:
   # ========================================
   # REDIS (для кэширования и сессий)
   # ========================================
-#  redis:
-#    image: redis:7-alpine
-#    container_name: azhur-redis
-#    restart: unless-stopped
-#    ports:
-#      - "6379:6379"
-#    volumes:
-#      - redis_data:/data
-#    command: redis-server --appendonly yes
-#    networks:
-#      - azhur-network
+  redis:
+    image: redis:7-alpine
+    container_name: azhur-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - azhur-network
 
   # ========================================
   # ELASTICSEARCH (для хранения логов)
@@ -147,6 +147,8 @@ volumes:
   prometheus_data:
     driver: local
   grafana_data:
+    driver: local
+  uploads_data:
     driver: local
 
 networks:

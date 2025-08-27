@@ -5,7 +5,7 @@ import azhue.katering.azhurkateringbackendjava.auth.exception.email.EmailExcepti
 import azhue.katering.azhurkateringbackendjava.auth.exception.email.VereficationCodeException;
 import azhue.katering.azhurkateringbackendjava.auth.exception.email.VerifiedException;
 import azhue.katering.azhurkateringbackendjava.auth.exception.token.*;
-import azhue.katering.azhurkateringbackendjava.common.dto.ApiResponse;
+import azhue.katering.azhurkateringbackendjava.common.model.dto.ApiResponse;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

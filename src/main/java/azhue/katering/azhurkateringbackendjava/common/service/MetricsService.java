@@ -16,17 +16,42 @@ public class MetricsService {
     private final Counter registrationsCounter;
     private final Counter emailVerificationsCounter;
     private final Counter emailsSentCounter;
-    private final Counter emailErrorsCounter;
-    private final Timer authProcessingTimer;
-    private final Timer emailSendingTimer;
-    private final Timer emailProcessingTimer;
+
     
     // Специфичные таймеры для каждой операции
+    private final Timer emailProcessingTimer;
     private final Timer loginProcessingTimer;
     private final Timer registerProcessingTimer;
     private final Timer refreshTokenProcessingTimer;
     private final Timer logoutProcessingTimer;
     private final Timer changePasswordProcessingTimer;
+
+    // Метрики для блюд
+    private final Counter dishCreateCounter;
+    private final Counter dishUpdateCounter;
+    private final Counter dishDeleteCounter;
+    private final Counter dishReadCounter;
+    private final Counter dishAvailabilityToggleCounter;
+    private final Counter dishSearchCounter;
+    
+    // Таймеры для блюд
+    private final Timer dishCreateProcessingTimer;
+    private final Timer dishUpdateProcessingTimer;
+    private final Timer dishDeleteProcessingTimer;
+    private final Timer dishReadProcessingTimer;
+    private final Timer dishSearchProcessingTimer;
+    
+    // Метрики для изображений
+    private final Counter imageUploadCounter;
+    private final Counter imageDeleteCounter;
+    private final Counter imageUpdateCounter;
+    private final Counter imageProcessingErrorCounter;
+    
+    // Таймеры для изображений
+    private final Timer imageUploadProcessingTimer;
+    private final Timer imageDeleteProcessingTimer;
+    private final Timer imageUpdateProcessingTimer;
+
 
     public MetricsService(MeterRegistry meterRegistry) {
         this.loginAttemptsCounter = Counter.builder("auth.login.attempts")
@@ -53,18 +78,6 @@ public class MetricsService {
                 .description("Total emails sent")
                 .register(meterRegistry);
         
-        this.emailErrorsCounter = Counter.builder("email.errors")
-                .description("Email sending errors")
-                .register(meterRegistry);
-        
-        this.authProcessingTimer = Timer.builder("auth.processing.time")
-                .description("Authentication processing time")
-                .register(meterRegistry);
-        
-        this.emailSendingTimer = Timer.builder("email.sending.time")
-                .description("Email sending time")
-                .register(meterRegistry);
-        
         this.emailProcessingTimer = Timer.builder("email.processing.time")
                 .description("Email processing time")
                 .register(meterRegistry);
@@ -89,6 +102,82 @@ public class MetricsService {
         this.changePasswordProcessingTimer = Timer.builder("auth.change_password.processing.time")
                 .description("Change password processing time")
                 .register(meterRegistry);
+        
+        // Инициализация метрик для блюд
+        this.dishCreateCounter = Counter.builder("dish.create.total")
+                .description("Total dishes created")
+                .register(meterRegistry);
+        
+        this.dishUpdateCounter = Counter.builder("dish.update.total")
+                .description("Total dishes updated")
+                .register(meterRegistry);
+        
+        this.dishDeleteCounter = Counter.builder("dish.delete.total")
+                .description("Total dishes deleted")
+                .register(meterRegistry);
+        
+        this.dishReadCounter = Counter.builder("dish.read.total")
+                .description("Total dish read operations")
+                .register(meterRegistry);
+        
+        this.dishAvailabilityToggleCounter = Counter.builder("dish.availability.toggle.total")
+                .description("Total dish availability toggles")
+                .register(meterRegistry);
+        
+        this.dishSearchCounter = Counter.builder("dish.search.total")
+                .description("Total dish search operations")
+                .register(meterRegistry);
+        
+        // Инициализация таймеров для блюд
+        this.dishCreateProcessingTimer = Timer.builder("dish.create.processing.time")
+                .description("Dish creation processing time")
+                .register(meterRegistry);
+        
+        this.dishUpdateProcessingTimer = Timer.builder("dish.update.processing.time")
+                .description("Dish update processing time")
+                .register(meterRegistry);
+        
+        this.dishDeleteProcessingTimer = Timer.builder("dish.delete.processing.time")
+                .description("Dish deletion processing time")
+                .register(meterRegistry);
+        
+        this.dishReadProcessingTimer = Timer.builder("dish.read.processing.time")
+                .description("Dish read processing time")
+                .register(meterRegistry);
+        
+        this.dishSearchProcessingTimer = Timer.builder("dish.search.processing.time")
+                .description("Dish search processing time")
+                .register(meterRegistry);
+        
+        // Инициализация метрик для изображений
+        this.imageUploadCounter = Counter.builder("image.upload.total")
+                .description("Total images uploaded")
+                .register(meterRegistry);
+        
+        this.imageDeleteCounter = Counter.builder("image.delete.total")
+                .description("Total images deleted")
+                .register(meterRegistry);
+        
+        this.imageUpdateCounter = Counter.builder("image.update.total")
+                .description("Total images updated")
+                .register(meterRegistry);
+        
+        this.imageProcessingErrorCounter = Counter.builder("image.processing.errors")
+                .description("Total image processing errors")
+                .register(meterRegistry);
+        
+        // Инициализация таймеров для изображений
+        this.imageUploadProcessingTimer = Timer.builder("image.upload.processing.time")
+                .description("Image upload processing time")
+                .register(meterRegistry);
+        
+        this.imageDeleteProcessingTimer = Timer.builder("image.delete.processing.time")
+                .description("Image deletion processing time")
+                .register(meterRegistry);
+        
+        this.imageUpdateProcessingTimer = Timer.builder("image.update.processing.time")
+                .description("Image update processing time")
+                .register(meterRegistry);
     }
 
     public void incrementLoginAttempts() {
@@ -109,30 +198,6 @@ public class MetricsService {
 
     public void incrementEmailVerifications() {
         emailVerificationsCounter.increment();
-    }
-
-    public Timer.Sample startAuthProcessingTimer() {
-        return Timer.start();
-    }
-
-    public void stopAuthProcessingTimer(Timer.Sample sample) {
-        sample.stop(authProcessingTimer);
-    }
-
-    public Timer.Sample startEmailSendingTimer() {
-        return Timer.start();
-    }
-
-    public void stopEmailSendingTimer(Timer.Sample sample) {
-        sample.stop(emailSendingTimer);
-    }
-
-    public void recordAuthProcessingTime(long timeInMs) {
-        authProcessingTimer.record(timeInMs, TimeUnit.MILLISECONDS);
-    }
-
-    public void recordEmailSendingTime(long timeInMs) {
-        emailSendingTimer.record(timeInMs, TimeUnit.MILLISECONDS);
     }
     
     // Методы для специфичных таймеров
@@ -181,10 +246,6 @@ public class MetricsService {
         emailsSentCounter.increment();
     }
     
-    public void incrementEmailErrors() {
-        emailErrorsCounter.increment();
-    }
-    
     public Timer.Sample startEmailProcessingTimer() {
         return Timer.start();
     }
@@ -192,4 +253,114 @@ public class MetricsService {
     public void stopEmailProcessingTimer(Timer.Sample sample) {
         sample.stop(emailProcessingTimer);
     }
+    
+    // Методы для метрик блюд
+    public void incrementDishCreate() {
+        dishCreateCounter.increment();
+    }
+    
+    public void incrementDishUpdate() {
+        dishUpdateCounter.increment();
+    }
+    
+    public void incrementDishDelete() {
+        dishDeleteCounter.increment();
+    }
+    
+    public void incrementDishRead() {
+        dishReadCounter.increment();
+    }
+    
+    public void incrementDishAvailabilityToggle() {
+        dishAvailabilityToggleCounter.increment();
+    }
+    
+    public void incrementDishSearch() {
+        dishSearchCounter.increment();
+    }
+    
+    // Таймеры для блюд
+    public Timer.Sample startDishCreateProcessingTimer() {
+        return Timer.start();
+    }
+    
+    public void stopDishCreateProcessingTimer(Timer.Sample sample) {
+        sample.stop(dishCreateProcessingTimer);
+    }
+    
+    public Timer.Sample startDishUpdateProcessingTimer() {
+        return Timer.start();
+    }
+    
+    public void stopDishUpdateProcessingTimer(Timer.Sample sample) {
+        sample.stop(dishUpdateProcessingTimer);
+    }
+    
+    public Timer.Sample startDishDeleteProcessingTimer() {
+        return Timer.start();
+    }
+    
+    public void stopDishDeleteProcessingTimer(Timer.Sample sample) {
+        sample.stop(dishDeleteProcessingTimer);
+    }
+    
+    public Timer.Sample startDishReadProcessingTimer() {
+        return Timer.start();
+    }
+    
+    public void stopDishReadProcessingTimer(Timer.Sample sample) {
+        sample.stop(dishReadProcessingTimer);
+    }
+    
+    public Timer.Sample startDishSearchProcessingTimer() {
+        return Timer.start();
+    }
+    
+    public void stopDishSearchProcessingTimer(Timer.Sample sample) {
+        sample.stop(dishSearchProcessingTimer);
+    }
+    
+    // Методы для метрик изображений
+    public void incrementImageUpload() {
+        imageUploadCounter.increment();
+    }
+    
+    public void incrementImageDelete() {
+        imageDeleteCounter.increment();
+    }
+    
+    public void incrementImageUpdate() {
+        imageUpdateCounter.increment();
+    }
+    
+    public void incrementImageProcessingError() {
+        imageProcessingErrorCounter.increment();
+    }
+    
+    // Таймеры для изображений
+    public Timer.Sample startImageUploadProcessingTimer() {
+        return Timer.start();
+    }
+    
+    public void stopImageUploadProcessingTimer(Timer.Sample sample) {
+        sample.stop(imageUploadProcessingTimer);
+    }
+    
+    public Timer.Sample startImageDeleteProcessingTimer() {
+        return Timer.start();
+    }
+    
+    public void stopImageDeleteProcessingTimer(Timer.Sample sample) {
+        sample.stop(imageDeleteProcessingTimer);
+    }
+    
+    public Timer.Sample startImageUpdateProcessingTimer() {
+        return Timer.start();
+    }
+    
+    public void stopImageUpdateProcessingTimer(Timer.Sample sample) {
+        sample.stop(imageUpdateProcessingTimer);
+    }
+    
+
 }

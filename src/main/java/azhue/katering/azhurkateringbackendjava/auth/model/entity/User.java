@@ -1,6 +1,6 @@
 package azhue.katering.azhurkateringbackendjava.auth.model.entity;
 
-import azhue.katering.azhurkateringbackendjava.common.entity.BaseEntity;
+import azhue.katering.azhurkateringbackendjava.common.model.entity.BaseEntity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.proxy.HibernateProxy;

@@ -1,4 +1,4 @@
-package azhue.katering.azhurkateringbackendjava.common.entity;
+package azhue.katering.azhurkateringbackendjava.common.model.entity;
 
 import jakarta.persistence.*;
 import lombok.Getter;

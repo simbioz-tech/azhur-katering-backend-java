@@ -1,4 +1,4 @@
-package azhue.katering.azhurkateringbackendjava.common.dto;
+package azhue.katering.azhurkateringbackendjava.common.model.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
